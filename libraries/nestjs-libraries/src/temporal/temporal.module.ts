@@ -66,7 +66,15 @@ export const getTemporalModule = (
                 // workflow thread + V8 isolate, sticky cache) on them.
                 return {
                   taskQueue,
-                  ...(taskQueue === 'main' ? { workflowsPath: path! } : {}),
+                  ...(taskQueue === 'main'
+                    ? process.env.TEMPORAL_WORKFLOW_BUNDLE_PATH
+                      ? {
+                          workflowBundle: {
+                            codePath: process.env.TEMPORAL_WORKFLOW_BUNDLE_PATH,
+                          },
+                        }
+                      : { workflowsPath: path! }
+                    : {}),
                   activityClasses: activityClasses!,
                   autoStart: true,
                   workerOptions: {

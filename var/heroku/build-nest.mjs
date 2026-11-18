@@ -2,7 +2,10 @@ import ts from 'typescript';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import { bundleWorkflowCode } from '@temporalio/worker';
 
+const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../..');
 
@@ -105,8 +108,7 @@ function compileTree(dirs, outRoot) {
             esModuleInterop: true,
             allowSyntheticDefaultImports: true,
             jsx: ts.JsxEmit.ReactJSX,
-            sourceMap: true,
-            inlineSources: true,
+            sourceMap: false,
           },
           transformers: {
             before: [makeAliasTransformer(outJs, outRoot)],
@@ -114,9 +116,6 @@ function compileTree(dirs, outRoot) {
         });
         fs.mkdirSync(path.dirname(outJs), { recursive: true });
         fs.writeFileSync(outJs, res.outputText);
-        if (res.sourceMapText) {
-          fs.writeFileSync(outJs + '.map', res.sourceMapText);
-        }
         count++;
       } else if (entry.name.endsWith('.json')) {
         const rel = path.relative(repoRoot, full);
@@ -148,8 +147,16 @@ const total = compileTree(sourceDirs, backendDist);
 fs.rmSync(orchestratorDist, { recursive: true, force: true });
 fs.cpSync(backendDist, orchestratorDist, { recursive: true });
 
+console.log('[build-nest] Pre-bundling Temporal workflows...');
+const workflowEntry = require.resolve(
+  path.join(orchestratorDist, 'apps/orchestrator/src/workflows')
+);
+const { code } = await bundleWorkflowCode({ workflowsPath: workflowEntry });
+const bundleOut = path.join(orchestratorDist, 'workflow-bundle.js');
+fs.writeFileSync(bundleOut, code);
+
 console.log(
-  `[build-nest] Compiled ${total} files cleanly (peak RSS: ${Math.round(
-    process.memoryUsage().rss / 1024 / 1024
-  )} MB)`
+  `[build-nest] Compiled ${total} files + workflow bundle (${Math.round(
+    code.length / 1024
+  )} KB, peak RSS: ${Math.round(process.memoryUsage().rss / 1024 / 1024)} MB)`
 );

@@ -187,7 +187,7 @@ fs.writeFileSync("/tmp/temporal/config/heroku.yaml", yaml);
 '
 
   echo "[Heroku Entrypoint] Starting Temporal Server on 127.0.0.1:7233..."
-  (cd /tmp/temporal && temporal-server --root /tmp/temporal --config /tmp/temporal/config --env heroku --allow-no-auth start) &
+  (cd /tmp/temporal && temporal-server --root /tmp/temporal --config config --env heroku --allow-no-auth start) &
 
   for i in $(seq 1 30); do
     if temporal operator namespace list --address 127.0.0.1:7233 >/dev/null 2>&1; then
