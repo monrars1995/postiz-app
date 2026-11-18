@@ -1,0 +1,114 @@
+pid                             /tmp/nginx.pid;
+worker_processes                auto;
+error_log                       /dev/stderr warn;
+
+events {
+    worker_connections          1024;
+}
+
+http {
+    include                     /etc/nginx/mime.types;
+    default_type                application/octet-stream;
+    sendfile                    on;
+    access_log                  /dev/stdout;
+    client_max_body_size        2G;
+
+    client_body_temp_path       /tmp/nginx_client_temp;
+    proxy_temp_path             /tmp/nginx_proxy_temp;
+    fastcgi_temp_path           /tmp/nginx_fastcgi_temp;
+    uwsgi_temp_path             /tmp/nginx_uwsgi_temp;
+    scgi_temp_path              /tmp/nginx_scgi_temp;
+
+    map $http_x_forwarded_proto $forwarded_proto {
+        default $http_x_forwarded_proto;
+        ""      $scheme;
+    }
+
+    server {
+        listen __HEROKU_PORT__;
+        server_name _;
+        gzip on;
+        gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+
+        location = /healthz {
+            access_log off;
+            default_type text/plain;
+            return 200 "ok\n";
+        }
+
+        location @starting {
+            default_type text/html;
+            add_header Retry-After 5 always;
+            return 503 '<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="5"><title>Postiz - Inicializando</title></head><body style="font-family:sans-serif;background:#0e0e11;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center"><h2>Postiz esta inicializando os servicos...</h2><p>Esta pagina atualizara automaticamente em alguns segundos.</p></div></body></html>';
+        }
+
+        location /api/ {
+            proxy_pass http://127.0.0.1:3000/;
+            proxy_http_version 1.1;
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_read_timeout 300s;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $forwarded_proto;
+            proxy_set_header Reload $http_reload;
+            proxy_set_header Onboarding $http_onboarding;
+            proxy_set_header Activate $http_activate;
+            proxy_set_header Auth $http_auth;
+            proxy_set_header Showorg $http_showorg;
+            proxy_set_header Impersonate $http_impersonate;
+            proxy_set_header Accept-Language $http_accept_language;
+        }
+
+        # Direct root MCP & OAuth discovery endpoints for AI agents (Claude, ChatGPT, Cursor, Antigravity)
+        location ~ ^/(\.well-known/|mcp($|/|-oauth)|sse/|message/) {
+            proxy_pass http://127.0.0.1:3000;
+            proxy_http_version 1.1;
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_read_timeout 300s;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $forwarded_proto;
+            proxy_set_header Authorization $http_authorization;
+        }
+
+        location /uploads/ {
+            alias /tmp/uploads/;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header Content-Security-Policy "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'none'; script-src 'none'; frame-ancestors 'none'; sandbox" always;
+            types {
+                image/jpeg jpg jpeg;
+                image/png png;
+                image/gif gif;
+                image/webp webp;
+                image/avif avif;
+                image/bmp bmp;
+                image/tiff tif tiff;
+                video/mp4 mp4;
+            }
+            default_type application/octet-stream;
+        }
+
+        location / {
+            proxy_pass http://127.0.0.1:4200/;
+            proxy_http_version 1.1;
+            proxy_intercept_errors on;
+            error_page 502 503 504 = @starting;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $forwarded_proto;
+            proxy_set_header Reload $http_reload;
+            proxy_set_header Onboarding $http_onboarding;
+            proxy_set_header Activate $http_activate;
+            proxy_set_header Auth $http_auth;
+            proxy_set_header Showorg $http_showorg;
+            proxy_set_header Impersonate $http_impersonate;
+            proxy_set_header Accept-Language $http_accept_language;
+            proxy_set_header i18next $http_i18next;
+        }
+    }
+}
