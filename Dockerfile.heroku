@@ -46,12 +46,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends g++ make python
   && NODE_OPTIONS="--max-old-space-size=2048" pnpm --filter ./apps/frontend run build \
   && rm -rf /app/apps/frontend/.next/cache \
   && find /app/apps/frontend/.next -name "*.map" -delete \
-  && echo "=== Building backend ===" && df -h / \
-  && NODE_OPTIONS="--max-old-space-size=2048" pnpm --filter ./apps/backend run build \
-  && find /app/apps/backend/dist \( -name "*.d.ts" -o -name "*.tsbuildinfo" \) -delete \
-  && echo "=== Building orchestrator ===" && df -h / \
-  && NODE_OPTIONS="--max-old-space-size=2048" pnpm --filter ./apps/orchestrator run build \
-  && find /app/apps/orchestrator/dist \( -name "*.d.ts" -o -name "*.tsbuildinfo" \) -delete \
+  && echo "=== Building backend & orchestrator (low-RAM TS transpiler) ===" && df -h / \
+  && node /app/var/heroku/build-nest.mjs \
+  && node --experimental-require-module -e 'require("reflect-metadata"); process.env.DATABASE_URL="postgresql://u:p@127.0.0.1:5432/db"; delete process.env.REDIS_URL; require("./apps/backend/dist/apps/backend/src/app.module"); require("./apps/orchestrator/dist/apps/orchestrator/src/app.module"); console.log("Module graph verified!"); process.exit(0);' \
   && echo "=== Finalizing permissions ===" && df -h / \
   && chmod +x /app/var/heroku/entrypoint.sh \
   && mkdir -p /uploads /app/apps/frontend/.next/cache /var/lib/nginx /var/log/nginx \
